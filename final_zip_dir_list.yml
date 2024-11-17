@@ -1,0 +1,12 @@
+required_directories:
+  - src
+required_files:
+  - setup.cfg
+  - pyproject.toml
+  - download_dataset.sh
+optional_directories:
+  - additional_data
+optional_files:
+  - README.txt
+  - grayscale_predictions.zip
+  - training_results_dict.json
