@@ -82,8 +82,26 @@ def model_and_optimizer(args, model) -> Tuple[nn.Module, torch.optim.Optimizer]:
     # TODO: YOUR CODE HERE                                                    #
     ###########################################################################
 
-    raise NotImplementedError('`model_and_optimizer()` function in ' +
-        '`part6_transfer_learning.py` needs to be implemented')
+    model.cls[-1] = nn.Conv2d(512, 2, (1,1))
+    model.aux[-1] = nn.Conv2d(256, 2, (1,1))
+
+    parameter_group = [
+        {"params": model.layer0.parameters(), "lr":args.base_lr}, 
+        {"params": model.layer1.parameters(), "lr":args.base_lr}, 
+        {"params": model.layer2.parameters(), "lr":args.base_lr}, 
+        {"params": model.layer3.parameters(), "lr":args.base_lr}, 
+        {"params": model.layer4.parameters(), "lr":args.base_lr}, 
+        {"params": model.ppm.parameters(), "lr":args.base_lr*10}, 
+        {"params": model.cls.parameters(), "lr":args.base_lr*10}, 
+        {"params": model.aux.parameters(), "lr":args.base_lr*10}
+    ]
+    optimizer = torch.optim.SGD(
+        parameter_group, lr=args.base_lr, momentum=args.momentum,
+        weight_decay=args.weight_decay, 
+    )
+
+    # raise NotImplementedError('`model_and_optimizer()` function in ' +
+    #     '`part6_transfer_learning.py` needs to be implemented')
 
     ###########################################################################
     #                             END OF YOUR CODE                            #

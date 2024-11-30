@@ -7,6 +7,8 @@ import src.vision.cv2_transforms as transform
 from src.vision.part5_pspnet import PSPNet
 from src.vision.part4_segmentation_net import SimpleSegmentationNet
 
+from types import SimpleNamespace
+
 
 def get_model_and_optimizer(args) -> Tuple[nn.Module, torch.optim.Optimizer]:
     """
@@ -33,13 +35,60 @@ def get_model_and_optimizer(args) -> Tuple[nn.Module, torch.optim.Optimizer]:
     # TODO: YOUR CODE HERE                                                    #
     ###########################################################################
 
+    # Step 1: Create the model based on architecture type
+    if args.arch == "PSPNet":
+        model = PSPNet(args)  # Example function for creating a PSPNet model
+    elif args.arch == "SimpleSegmentationNet":
+        print("hello")
+        model = SimpleSegmentationNet(args)  # Example for simpler model
+    else:
+        raise ValueError(f"Unsupported architecture: {args.arch}")
+
+    # Step 2: Separate parameters into groups
+    param_groups = []
+    
+    # ResNet layer groups (0th + 1st, 2nd, 3rd, 4th layers)
+    base_lr = args.base_lr  # Base learning rate for ResNet layers
+    resnet_layers = [model.resnet.layer0, model.resnet.layer1,
+                     model.resnet.layer2, model.resnet.layer3,
+                     model.resnet.layer4]
+    
+    for layer in resnet_layers:
+        param_groups.append({
+            "params": layer.parameters(),
+            "lr": base_lr,  # Base learning rate
+            "momentum": args.momentum,
+            "weight_decay": args.weight_decay,
+        })
+    
+    # PPM and classifier groups
+    if hasattr(model, "ppm"):
+        param_groups.append({
+            "params": model.ppm.parameters(),
+            "lr": 10 * base_lr,  # Higher learning rate for PPM
+            "momentum": args.momentum,
+            "weight_decay": args.weight_decay,
+        })
+
+    if hasattr(model, "classifier"):
+        param_groups.append({
+            "params": model.classifier.parameters(),
+            "lr": 10 * base_lr,  # Higher learning rate for classifier
+            "momentum": args.momentum,
+            "weight_decay": args.weight_decay,
+        })
+
+    # Step 3: Create the optimizer
+    optimizer = torch.optim.SGD(param_groups)
+
+    return model, optimizer
     raise NotImplementedError('`get_model_and_optimizer()` function in ' +
         '`part3_training_utils.py` needs to be implemented')
 
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
-    return model, optimizer
+    
 
 
 def update_learning_rate(current_lr: float, optimizer: torch.optim.Optimizer) -> torch.optim.Optimizer:
@@ -61,6 +110,15 @@ def update_learning_rate(current_lr: float, optimizer: torch.optim.Optimizer) ->
     # TODO: YOUR CODE HERE                                                    #
     ###########################################################################
 
+    for idx, param_group in enumerate(optimizer.param_groups):
+        if idx < 5:  # First 5 groups correspond to ResNet layers
+            param_group['lr'] = current_lr
+        else:  # Remaining groups correspond to PPM/classifier
+            param_group['lr'] = 10 * current_lr
+
+
+
+    return optimizer
     raise NotImplementedError('`update_learning_rate()` function in ' +
         '`part3_training_utils.py` needs to be implemented')
 
@@ -68,7 +126,7 @@ def update_learning_rate(current_lr: float, optimizer: torch.optim.Optimizer) ->
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
-    return optimizer
+    
 
 
 def get_train_transform(args) -> transform.Compose:
@@ -109,14 +167,36 @@ def get_train_transform(args) -> transform.Compose:
     ###########################################################################
     # TODO: YOUR CODE HERE                                                    #
     ###########################################################################
+   
+    
+    train_transform = transform.Compose([
+        # Resize shorter side
+        transform.Resize(size=[args.short_size,args.short_size]),
+        # Random horizontal flip
+        transform.RandomHorizontalFlip(),
+        # Random rotation
+        transform.RandRotate(rotate=(args.rotate_min, args.rotate_max), padding=mean),
+        # Random scaling
+        transform.RandScale(scale=(args.scale_min, args.scale_max)),
+        # Random crop
+        transform.Crop(size=(args.train_h, args.train_w), crop_type="rand",padding=mean),
+        # Convert to Tensor
+        transform.ToTensor(),
+        # Normalize by ImageNet mean and std
+        transform.Normalize(mean=mean, std=std),
+    ])
+    
 
+
+
+    return train_transform
     raise NotImplementedError('`get_train_transform()` function in ' +
         '`part3_training_utils.py` needs to be implemented')
 
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
-    return train_transform
+ 
 
 
 def get_val_transform(args) -> transform.Compose:
@@ -145,11 +225,23 @@ def get_val_transform(args) -> transform.Compose:
     ###########################################################################
     # TODO: YOUR CODE HERE                                                    #
     ###########################################################################
+    
+    
+    val_transform = transform.Compose(
+                                        [
+                                            transform.ResizeShort(args.short_size), 
+                                            transform.Crop((args.train_h, args.train_w)),
+                                            transform.ToTensor(), 
+                                            transform.Normalize(mean, std),
+                                        ]
+                                    )
 
-    raise NotImplementedError('`get_val_transform()` function in ' +
-        '`part3_training_utils.py` needs to be implemented')
+
+    return val_transform
+
+
 
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
-    return val_transform
+  

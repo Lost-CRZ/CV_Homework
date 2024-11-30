@@ -25,9 +25,13 @@ def test_get_model_and_optimizer_pspnet():
             "use_ppm": True
         }
     )
+    print("Hello")
     model, optimizer = get_model_and_optimizer(args)
-    # assert isinstance(model, PSPNet)
+
+    assert isinstance(model, PSPNet)
+ 
     assert isinstance(optimizer, torch.optim.Optimizer)
+
 
     assert len(optimizer.param_groups) > 1
     param_learning_rates = [group["lr"] for group in optimizer.param_groups]

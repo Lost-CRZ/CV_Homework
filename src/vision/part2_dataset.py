@@ -40,14 +40,34 @@ def make_dataset(split: str, data_root: str, data_list_fpath: str) -> List[Tuple
     # TODO: YOUR CODE HERE                                                    #
     ###########################################################################
 
+      # Initialize the list to store image-label path pairs
+    image_label_list = []
+
+    # Open the .txt file containing image-label paths
+    with open(data_list_fpath, "r") as file:
+        lines = file.readlines()
+
+    for line in lines:
+        # Each line contains the relative paths of the image and label, separated by a space
+        image_rel_path, label_rel_path = line.strip().split()
+
+        # Construct absolute paths for both image and label
+        image_abs_path = os.path.join(data_root, image_rel_path)
+        label_abs_path = os.path.join(data_root, label_rel_path)
+
+        # Append the absolute paths as a tuple to the list
+        image_label_list.append((image_abs_path, label_abs_path))
+
+    print(f"List of (image, label) pairs for {split} split generated!")
+
+    return image_label_list
     raise NotImplementedError('`make_dataset()` function in ' +
         '`part2_dataset.py` needs to be implemented')
 
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
-    print(f"List of (image,label) pairs {split} list generated!")
-    return image_label_list
+
 
 
 class SemData(Dataset):

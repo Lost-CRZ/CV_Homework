@@ -25,7 +25,7 @@ class SimpleSegmentationNet(nn.Module):
 
         self.criterion = criterion
         self.deep_base = deep_base
-
+      
         resnet = resnet50(pretrained=pretrained, deep_base=True)
         self.resnet = resnet
         self.layer0 = nn.Sequential(
@@ -72,10 +72,8 @@ class SimpleSegmentationNet(nn.Module):
         x = self.resnet.layer2(x)
         x = self.resnet.layer3(x)
         x = self.resnet.layer4(x)
-
         x = self.cls(x)
 
-        aux_loss = torch.Tensor([0])
 
         ########################################################################
         # TODO: YOUR CODE HERE                                                 #
@@ -84,6 +82,26 @@ class SimpleSegmentationNet(nn.Module):
         # pixel (yhat).                                                        #
         ########################################################################
 
+        # Upsample logits to match input image size (H, W)
+        logits = F.interpolate(x, size=(H, W), mode='bilinear')
+
+        # Predicted labels per pixel
+        yhat = torch.argmax(logits, dim=1, keepdim=False)  # Shape: (N, H, W)
+
+        # Compute main loss if ground truth labels are provided
+        main_loss = None
+        if y is not None:
+            main_loss = self.criterion(logits, y)
+        else:
+            None
+
+        # Auxiliary loss (dummy value)
+        if y is not None:
+            aux_loss = torch.Tensor([0])
+        else:
+            aux_loss = None
+        
+        return logits, yhat, main_loss, aux_loss
         raise NotImplementedError('`forward()` function in ' +
             '`part4_segmentation_net.py` needs to be implemented')
 
@@ -91,4 +109,4 @@ class SimpleSegmentationNet(nn.Module):
         #######################################################################
         #                             END OF YOUR CODE                        #
         #######################################################################
-        return logits, yhat, main_loss, aux_loss
+  

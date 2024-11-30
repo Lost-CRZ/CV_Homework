@@ -79,7 +79,7 @@ class Normalize(object):
 class Resize(object):
     # Resize the input to the given size, 'size' is a 2-element tuple or list in the order of (h, w).
     def __init__(self, size):
-        assert isinstance(size, collections.abc.Iterable) and len(size) == 2
+        assert isinstance(size, collections.Iterable) and len(size) == 2
         self.size = size
 
     def __call__(self, image: np.ndarray, label: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
@@ -119,9 +119,9 @@ class ResizeShort(object):
 class RandScale(object):
     # Randomly resize image & label with scale factor in [scale_min, scale_max]
     def __init__(self, scale, aspect_ratio=None):
-        assert isinstance(scale, collections.abc.Iterable) and len(scale) == 2
+        assert isinstance(scale, collections.Iterable) and len(scale) == 2
         if (
-            isinstance(scale, collections.abc.Iterable)
+            isinstance(scale, collections.Iterable)
             and len(scale) == 2
             and isinstance(scale[0], numbers.Number)
             and isinstance(scale[1], numbers.Number)
@@ -133,7 +133,7 @@ class RandScale(object):
         if aspect_ratio is None:
             self.aspect_ratio = aspect_ratio
         elif (
-            isinstance(aspect_ratio, collections.abc.Iterable)
+            isinstance(aspect_ratio, collections.Iterable)
             and len(aspect_ratio) == 2
             and isinstance(aspect_ratio[0], numbers.Number)
             and isinstance(aspect_ratio[1], numbers.Number)
@@ -177,7 +177,7 @@ class Crop(object):
             self.crop_h = size
             self.crop_w = size
         elif (
-            isinstance(size, collections.abc.Iterable)
+            isinstance(size, collections.Iterable)
             and len(size) == 2
             and isinstance(size[0], int)
             and isinstance(size[1], int)
@@ -253,7 +253,7 @@ class RandRotate(object):
     def __init__(
         self, rotate: Tuple[float, float], padding: Tuple[int, int, int], ignore_label: int = 255, p: float = 0.5
     ) -> None:
-        assert isinstance(rotate, collections.abc.Iterable) and len(rotate) == 2
+        assert isinstance(rotate, collections.Iterable) and len(rotate) == 2
         if isinstance(rotate[0], numbers.Number) and isinstance(rotate[1], numbers.Number) and rotate[0] < rotate[1]:
             self.rotate = rotate
         else:

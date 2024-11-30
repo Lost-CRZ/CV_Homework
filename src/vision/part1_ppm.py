@@ -46,13 +46,25 @@ class PPM(nn.Module):
         # TODO: YOUR CODE HERE                                                #
         #######################################################################
 
-        raise NotImplementedError('`__init__()` function in ' +
-            '`part1_ppm.py` needs to be implemented')
+        for bin_size in bins:
+            # Each module contains AdaptiveAvgPool2d, Conv2d, BatchNorm2d, and ReLU
+            self.features.append(
+                nn.Sequential(
+                    nn.AdaptiveAvgPool2d(bin_size),  # Pooling into (bin x bin)
+                    nn.Conv2d(in_dim, reduction_dim, kernel_size=1, bias=False),  # 1x1 convolution
+                    nn.BatchNorm2d(reduction_dim, affine=True),  # BatchNorm2d
+                    nn.ReLU(inplace=True)  # ReLU activation
+                )
+            )
+
+        self.features = nn.ModuleList(self.features)
+        # raise NotImplementedError('`__init__()` function in ' +
+        #     '`part1_ppm.py` needs to be implemented')
 
         #######################################################################
         #                             END OF YOUR CODE                        #
         #######################################################################
-        self.features = nn.ModuleList(self.features)
+    
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -78,10 +90,25 @@ class PPM(nn.Module):
         # TODO: YOUR CODE HERE                                                #
         #######################################################################
 
-        raise NotImplementedError('`forward()` function in ' +
-            '`part1_ppm.py` needs to be implemented')
 
-        #######################################################################
-        #                             END OF YOUR CODE                        #
-        #######################################################################
+        outputs = [x]  # Start with the input as the first output
+        H, W = x.size(2), x.size(3)  # Original height and width
+
+        for module in self.features:
+            pooled = module(x)  # Pass input through the module  multiple modules are included here with different kernal size
+            # Upsample to the original input size
+            upsampled = nn.functional.interpolate(pooled, size=(H, W), mode='bilinear', align_corners=True)
+            outputs.append(upsampled)
+
+        # Concatenate along the channel dimension
+        output = torch.cat(outputs, dim=1)
         return output
+
+
+        # raise NotImplementedError('`forward()` function in ' +
+        #     '`part1_ppm.py` needs to be implemented')
+
+        # #######################################################################
+        # #                             END OF YOUR CODE                        #
+        # #######################################################################
+        # return output

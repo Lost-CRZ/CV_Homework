@@ -64,8 +64,30 @@ class PSPNet(nn.Module):
         # layer0, layer1, layer2, layer3, layer4. Note: layer0 should be sequential #
         #############################################################################
 
-        raise NotImplementedError('`__init__()` function in ' +
-            '`part5_pspnet.py` needs to be implemented')
+        self.deep_base = deep_base 
+        resnet = resnet50(pretrained=pretrained, deep_base=self.deep_base)
+        self.resnet = resnet
+        self.layer0 = nn.Sequential(
+            resnet.conv1,
+            resnet.bn1,
+            resnet.relu,
+            resnet.conv2,
+            resnet.bn2,
+            resnet.relu,
+            resnet.conv3,
+            resnet.bn3,
+            resnet.relu,
+            resnet.maxpool,
+        )        
+        self.layer1 = resnet.layer1
+        self.layer2 = resnet.layer2
+        self.layer3 = resnet.layer3
+        self.layer4 = resnet.layer4
+        self.avgpool = resnet.avgpool 
+        self.fc = resnet.fc
+
+        # raise NotImplementedError('`__init__()` function in ' +
+        #     '`part5_pspnet.py` needs to be implemented')
 
         #######################################################################
         #                             END OF YOUR CODE                        #
@@ -81,8 +103,24 @@ class PSPNet(nn.Module):
         # to the classifier
         ###########################################################################
 
-        raise NotImplementedError('`__init__()` function in ' +
-            '`part5_pspnet.py` needs to be implemented')
+       # Determine the input dimension for the Pyramid Pooling Module (PPM)
+        input_dim = self.layer4[-1].conv3.out_channels  # Typically 2048
+        input_dim = 2048  # Explicitly set the input dimension
+
+        # Calculate the reduction dimension based on the number of bins
+        reduction_dim = input_dim // len(bins)
+
+        # Initialize the Pyramid Pooling Module (PPM)
+        self.ppm = PPM(input_dim, reduction_dim, bins)
+
+        # Set the feature dimension after PPM
+        if self.use_ppm:
+            fea_dim = input_dim + reduction_dim * len(bins)
+        else:
+            fea_dim = input_dim
+
+        # raise NotImplementedError('`__init__()` function in ' +
+        #     '`part5_pspnet.py` needs to be implemented')
 
         #######################################################################
         #                             END OF YOUR CODE                        #
@@ -90,6 +128,7 @@ class PSPNet(nn.Module):
 
         self.cls = self.__create_classifier(in_feats=fea_dim, out_feats=512, num_classes=num_classes)
         self.aux = self.__create_classifier(in_feats=1024, out_feats=256, num_classes=num_classes)
+
 
     def __replace_conv_with_dilated_conv(self):
         """Increase the receptive field by reducing stride and increasing dilation.
@@ -108,9 +147,22 @@ class PSPNet(nn.Module):
         #######################################################################
         # TODO: YOUR CODE HERE                                                #
         #######################################################################
+        for block in self.layer3:
+                block.conv2.stride = (1, 1)
+                block.conv2.dilation = (2, 2)
+                block.conv2.padding = (2, 2)
+                if block.downsample is not None: 
+                    block.downsample[0].stride = (1, 1)
 
-        raise NotImplementedError('`__replace_conv_with_dilated_conv()` ' +
-            'function in `part5_pspnet.py` needs to be implemented')
+        for block in self.layer4: 
+            block.conv2.stride = (1, 1)
+            block.conv2.dilation = (4, 4)
+            block.conv2.padding = (4, 4)
+            if block.downsample is not None: 
+                block.downsample[0].stride = (1, 1)
+
+        # raise NotImplementedError('`__replace_conv_with_dilated_conv()` ' +
+        #     'function in `part5_pspnet.py` needs to be implemented')
 
         #######################################################################
         #                             END OF YOUR CODE                        #
@@ -140,8 +192,16 @@ class PSPNet(nn.Module):
         # TODO: YOUR CODE HERE                                                #
         #######################################################################
 
-        raise NotImplementedError('`__create_classifier()` function in ' +
-            '`part5_pspnet.py` needs to be implemented')
+        cls = nn.Sequential(
+            nn.Conv2d(in_feats, out_feats, (3, 3), padding="same"), 
+            nn.BatchNorm2d(out_feats),
+            nn.ReLU(),
+            nn.Dropout2d(self.dropout),
+            nn.Conv2d(out_feats, num_classes, (1, 1))
+        )
+
+        # raise NotImplementedError('`__create_classifier()` function in ' +
+        #     '`part5_pspnet.py` needs to be implemented')
 
         #######################################################################
         #                             END OF YOUR CODE                        #
@@ -198,8 +258,42 @@ class PSPNet(nn.Module):
         # TODO: YOUR CODE HERE                                                #
         #######################################################################
 
-        raise NotImplementedError('`forward()` function in ' +
-            '`part5_pspnet.py` needs to be implemented')
+      # Extract spatial dimensions from the input
+        height, width = x_size[2], x_size[3]
+
+        # Forward pass through the ResNet backbone
+        features = self.layer0(x)
+        features = self.layer1(features)
+        features = self.layer2(features)
+        aux_features = self.layer3(features)  # Features from layer3 for auxiliary loss
+        main_features = self.layer4(aux_features)  # Features from layer4 for main output
+
+        # Apply Pyramid Pooling Module (PPM) if enabled
+        if self.use_ppm:
+            ppm_output = self.ppm(main_features)
+        else:
+            ppm_output = main_features
+
+        # Main classifier and upsample logits to the original input size
+        logits = self.cls(ppm_output)
+        logits = F.interpolate(logits, size=(height, width), mode="bilinear", align_corners=False)
+        yhat = torch.argmax(logits, dim=1)  # Predicted labels
+
+        # Compute main loss if ground truth is provided
+        main_loss = self.criterion(logits, y) if y is not None else None
+
+        # Compute auxiliary loss during training if ground truth is provided
+        if self.training and y is not None:
+            aux_logits = self.aux(aux_features)
+            aux_logits = F.interpolate(aux_logits, size=(height, width), mode="bilinear", align_corners=False)
+            aux_loss = self.criterion(aux_logits, y)
+        elif not self.training:
+            aux_loss = torch.Tensor([0]).to(x.device)  # Dummy tensor for inference mode
+        else:
+            aux_loss = None
+
+        # raise NotImplementedError('`forward()` function in ' +
+        #     '`part5_pspnet.py` needs to be implemented')
 
         #######################################################################
         #                             END OF YOUR CODE                        #
